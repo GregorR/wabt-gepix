@@ -54,20 +54,22 @@ uint32_t WASM_RT_TABLE_APINAME(wasm_rt_grow)(WASM_RT_TABLE_TYPE* table,
                                              WASM_RT_TABLE_ELEMENT_TYPE init) {
   uint32_t old_elems = table->size;
   uint64_t new_elems = (uint64_t)table->size + delta;
+  void* new_data;
+  uint32_t i;
   if (new_elems == 0) {
     return 0;
   }
   if ((new_elems < old_elems) || (new_elems > table->max_size)) {
     return (uint32_t)-1;
   }
-  void* new_data =
+  new_data =
       realloc(table->data, new_elems * sizeof(WASM_RT_TABLE_ELEMENT_TYPE));
   if (!new_data) {
     return (uint32_t)-1;
   }
   table->data = new_data;
   table->size = new_elems;
-  for (uint32_t i = old_elems; i < new_elems; i++) {
+  for (i = old_elems; i < new_elems; i++) {
     table->data[i] = init;
   }
   return old_elems;

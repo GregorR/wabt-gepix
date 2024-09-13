@@ -97,23 +97,25 @@ static uint64_t MEMORY_API_NAME(grow_memory_impl)(MEMORY_TYPE* memory,
                                                   uint64_t delta) {
   uint64_t old_pages = memory->pages;
   uint64_t new_pages = memory->pages + delta;
+  uint64_t old_size, new_size, delta_size;
+  MEMORY_CELL_TYPE new_data;
   if (new_pages == 0) {
     return 0;
   }
   if (new_pages < old_pages || new_pages > memory->max_pages) {
     return (uint64_t)-1;
   }
-  uint64_t old_size = old_pages * WASM_PAGE_SIZE;
-  uint64_t new_size = new_pages * WASM_PAGE_SIZE;
-  uint64_t delta_size = delta * WASM_PAGE_SIZE;
+  old_size = old_pages * WASM_PAGE_SIZE;
+  new_size = new_pages * WASM_PAGE_SIZE;
+  delta_size = delta * WASM_PAGE_SIZE;
 #if WASM_RT_USE_MMAP
-  MEMORY_CELL_TYPE new_data = memory->data;
+  new_data = memory->data;
   int ret = os_mprotect((void*)(new_data + old_size), delta_size);
   if (ret != 0) {
     return (uint64_t)-1;
   }
 #else
-  MEMORY_CELL_TYPE new_data = realloc((void*)memory->data, new_size);
+  new_data = realloc((void*)memory->data, new_size);
   if (new_data == NULL) {
     return (uint64_t)-1;
   }
