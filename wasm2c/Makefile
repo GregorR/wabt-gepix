@@ -2,7 +2,7 @@ CC=cc
 CFLAGS=-O3
 AR=ar
 RANLIB=ranlib
-WLIB=wlib
+LIB=wlib
 
 OBJS=\
 	wasm-rt-impl.o \
@@ -14,9 +14,9 @@ libwasm-rt-impl.a: $(OBJS)
 	$(AR) rc $@ $(OBJS)
 	$(RANLIB) $@
 
-wlib: $(OBJS)
+lib: $(OBJS)
 	rm -f wasm-rt-impl.lib
-	$(WLIB) -n wasm-rt-impl.lib $(addprefix +,$(OBJS))
+	$(LIB) -n wasm-rt-impl.lib $(addprefix +,$(OBJS))
 
 zcclib: $(OBJS)
 	$(CC) -x -o wasm-rt-impl.lib $(OBJS)
