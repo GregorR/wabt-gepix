@@ -223,6 +223,7 @@ static inline void load_data(u8* dest, const u8* src, size_t n) {
   static inline void name##_unchecked(wasm_rt_memory_t* mem, u64 addr, \
                                       t2 value) {                      \
     t1 wrapped = (t1)value;                                            \
+    MEMCHECK(mem, addr, t1);                                           \
     wasm_rt_memcpy(MEM_ADDR_MEMOP(mem, addr, sizeof(t1)), &wrapped,    \
                    sizeof(t1));                                        \
   }                                                                    \
@@ -487,7 +488,11 @@ static float wasm_floorf(float x) {
   if (UNLIKELY(isnan(x))) {
     return quiet_nanf(x);
   }
+#if __STDC_VERSION__ >= 199901L
   return floorf(x);
+#else
+  return floor(x);
+#endif
 }
 
 static double wasm_ceil(double x) {
@@ -501,7 +506,11 @@ static float wasm_ceilf(float x) {
   if (UNLIKELY(isnan(x))) {
     return quiet_nanf(x);
   }
+#if __STDC_VERSION__ >= 199901L
   return ceilf(x);
+#else
+  return ceil(x);
+#endif
 }
 
 static double wasm_trunc(double x) {
@@ -515,7 +524,11 @@ static float wasm_truncf(float x) {
   if (UNLIKELY(isnan(x))) {
     return quiet_nanf(x);
   }
+#if __STDC_VERSION__ >= 199901L
   return truncf(x);
+#else
+  return trunc(x);
+#endif
 }
 
 static float wasm_nearbyintf(float x) {

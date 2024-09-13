@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+#include "ggt/best.h"
+
 #ifndef WASM_RT_CORE_TYPES_DEFINED
 #define WASM_RT_CORE_TYPES_DEFINED
 typedef uint8_t u8;
