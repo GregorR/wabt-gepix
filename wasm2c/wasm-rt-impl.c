@@ -27,12 +27,11 @@
 
 #if WASM_RT_INSTALL_SIGNAL_HANDLER && !defined(_WIN32)
 #include <signal.h>
-#include <unistd.h>
 #endif
 
 #ifdef _WIN32
 #include <windows.h>
-#else
+#elif _POSIX_VERSION >= 200112L
 #include <sys/mman.h>
 #endif
 

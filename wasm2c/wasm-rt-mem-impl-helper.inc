@@ -141,6 +141,8 @@ static uint64_t MEMORY_API_NAME(grow_memory_impl)(MEMORY_TYPE* memory,
                                                   uint64_t delta) {
   uint64_t old_pages = memory->pages;
   uint64_t new_pages = memory->pages + delta;
+  uint64_t old_size, new_size, delta_size;
+  MEMORY_CELL_TYPE new_data;
   if (new_pages == 0) {
     return 0;
   }

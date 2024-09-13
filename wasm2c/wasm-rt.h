@@ -23,6 +23,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(unix) || defined(__unix) || defined(__unix__) || \
+    (defined(__APPLE__) && defined(__MACH__))
+#include <unistd.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -125,7 +130,8 @@ extern "C" {
  * needed (so we can use the guard based range checks below).
  */
 #ifndef WASM_RT_USE_MMAP
-#if UINTPTR_MAX > 0xffffffff
+#if UINTPTR_MAX > 0xffffffff && \
+    (_WIN32 || _POSIX_VERSION >= 200112L)
 #define WASM_RT_USE_MMAP 1
 #else
 #define WASM_RT_USE_MMAP 0
@@ -364,8 +370,10 @@ extern WASM_RT_THREAD_LOCAL void* wasm_rt_last_segment_val;
 
 #if defined(_MSC_VER)
 #define WASM_RT_NO_RETURN __declspec(noreturn)
-#else
+#elif defined(__GNUC__)
 #define WASM_RT_NO_RETURN __attribute__((noreturn))
+#else
+#define WASM_RT_NO_RETURN
 #endif
 
 #if defined(__APPLE__) && WASM_RT_STACK_EXHAUSTION_HANDLER
@@ -580,7 +588,7 @@ typedef struct {
 #define WASM_RT_SETJMP(buf) \
   ((buf).initialized = true, WASM_RT_SETJMP_SETBUF((buf).buffer))
 
-#ifndef _WIN32
+#if _POSIX_VERSION >= 200112L
 #define WASM_RT_LONGJMP_UNCHECKED(buf, val) siglongjmp(buf, val)
 #else
 #define WASM_RT_LONGJMP_UNCHECKED(buf, val) longjmp(buf, val)
