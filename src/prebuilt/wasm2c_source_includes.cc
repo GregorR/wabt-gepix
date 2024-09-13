@@ -30,4 +30,7 @@ R"w2c_template(#include <alloca.h>
 )w2c_template"
 R"w2c_template(#endif
 )w2c_template"
+R"w2c_template(
+#include "ggt/best.h"
+)w2c_template"
 ;

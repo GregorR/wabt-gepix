@@ -329,9 +329,9 @@ R"w2c_template(
 )w2c_template"
 R"w2c_template(  static inline t3 name(wasm_rt_memory_t* mem, u64 addr) {         \
 )w2c_template"
-R"w2c_template(    MEMCHECK(mem, addr, t1);                                       \
-)w2c_template"
 R"w2c_template(    t1 result;                                                     \
+)w2c_template"
+R"w2c_template(    MEMCHECK(mem, addr, t1);                                       \
 )w2c_template"
 R"w2c_template(    wasm_rt_memcpy(&result, MEM_ADDR_MEMOP(mem, addr, sizeof(t1)), \
 )w2c_template"
@@ -348,9 +348,9 @@ R"w2c_template(
 )w2c_template"
 R"w2c_template(  static inline void name(wasm_rt_memory_t* mem, u64 addr, t2 value) { \
 )w2c_template"
-R"w2c_template(    MEMCHECK(mem, addr, t1);                                           \
-)w2c_template"
 R"w2c_template(    t1 wrapped = (t1)value;                                            \
+)w2c_template"
+R"w2c_template(    MEMCHECK(mem, addr, t1);                                           \
 )w2c_template"
 R"w2c_template(    wasm_rt_memcpy(MEM_ADDR_MEMOP(mem, addr, sizeof(t1)), &wrapped,    \
 )w2c_template"
@@ -851,7 +851,15 @@ R"w2c_template(    return quiet_nanf(x);
 )w2c_template"
 R"w2c_template(  }
 )w2c_template"
+R"w2c_template(#if __STDC_VERSION__ >= 199901L
+)w2c_template"
 R"w2c_template(  return floorf(x);
+)w2c_template"
+R"w2c_template(#else
+)w2c_template"
+R"w2c_template(  return floor(x);
+)w2c_template"
+R"w2c_template(#endif
 )w2c_template"
 R"w2c_template(}
 )w2c_template"
@@ -877,7 +885,15 @@ R"w2c_template(    return quiet_nanf(x);
 )w2c_template"
 R"w2c_template(  }
 )w2c_template"
+R"w2c_template(#if __STDC_VERSION__ >= 199901L
+)w2c_template"
 R"w2c_template(  return ceilf(x);
+)w2c_template"
+R"w2c_template(#else
+)w2c_template"
+R"w2c_template(  return ceil(x);
+)w2c_template"
+R"w2c_template(#endif
 )w2c_template"
 R"w2c_template(}
 )w2c_template"
@@ -903,7 +919,15 @@ R"w2c_template(    return quiet_nanf(x);
 )w2c_template"
 R"w2c_template(  }
 )w2c_template"
+R"w2c_template(#if __STDC_VERSION__ >= 199901L
+)w2c_template"
 R"w2c_template(  return truncf(x);
+)w2c_template"
+R"w2c_template(#else
+)w2c_template"
+R"w2c_template(  return trunc(x);
+)w2c_template"
+R"w2c_template(#endif
 )w2c_template"
 R"w2c_template(}
 )w2c_template"

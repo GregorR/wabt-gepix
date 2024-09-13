@@ -425,7 +425,9 @@ class CWriter {
   void WriteParams(const std::vector<std::string>& index_to_name);
   void WriteParamSymbols(const std::vector<std::string>& index_to_name);
   void WriteParamTypes(const FuncDeclaration& decl);
+  void WriteLocalsParams(const std::vector<std::string>& index_to_name);
   void WriteLocals(const std::vector<std::string>& index_to_name);
+  void WriteArgTransfer(const std::vector<std::string>& index_to_name);
   void WriteStackVarDeclarations();
   void Write(const ExprList&);
   void WriteTailCallAsserts(const FuncSignature&);
@@ -437,6 +439,8 @@ class CWriter {
 
   template <typename Vars, typename TypeOf, typename ToDo>
   void WriteVarsByType(const Vars&, const TypeOf&, const ToDo&);
+  template <typename Vars, typename TypeOf, typename ToDo>
+  void WriteVarInits(const Vars&, const TypeOf&, const ToDo&);
 
   template <typename sources>
   void Spill(const TypeVector&, const sources& src);
@@ -1092,6 +1096,7 @@ void CWriter::Write(std::string_view s) {
 }
 
 void CWriter::Write(const ParamName& name) {
+  Write("l->");
   Write(GetLocalName(name.name, false));
 }
 
@@ -1114,6 +1119,8 @@ void CWriter::Write(const ExternalInstancePtr& name) {
   if (!IsImport(name.name)) {
     Write("&");
   }
+  if (func_)
+    Write("l->");
   Write("instance->", GlobalName(name));
 }
 
@@ -1131,9 +1138,9 @@ void CWriter::Write(const TailCallRef& name) {
 
 void CWriter::Write(const ExternalInstanceRef& name) {
   if (IsImport(name.name)) {
-    Write("(*instance->", GlobalName(name), ")");
+    Write("(*", (func_ ? "l->" : ""), "instance->", GlobalName(name), ")");
   } else {
-    Write("instance->", GlobalName(name));
+    Write((func_ ? "l->" : ""), "instance->", GlobalName(name));
   }
 }
 
@@ -1182,6 +1189,8 @@ void CWriter::Write(const StackVar& sv) {
     assert(index < type_stack_.size());
     type = type_stack_[index];
   }
+
+  Write("l->");
 
   StackTypePair stp = {index, type};
   auto iter = stack_var_sym_map_.find(stp);
@@ -1457,10 +1466,10 @@ void CWriter::WriteInitExprTerminal(const Expr* expr) {
       Write("}, ");
 
       if (IsImport(func->name)) {
-        Write("instance->", GlobalName(ModuleFieldType::Import,
+        Write("l->instance->", GlobalName(ModuleFieldType::Import,
                                        import_module_sym_map_[func->name]));
       } else {
-        Write("instance");
+        Write("l->instance");
       }
       Write("}");
     } break;
@@ -1939,7 +1948,8 @@ void CWriter::WriteFuncDeclarations() {
 
 void CWriter::WriteFuncDeclaration(const FuncDeclaration& decl,
                                    const std::string& name) {
-  Write(decl.sig.result_types, " ", name, "(");
+  Write("ggt_ret_t ", name, "(ggt_thread_t*, ",
+        decl.sig.result_types, "*, ");
   Write(ModuleInstanceTypeName(), "*");
   WriteParamTypes(decl);
   Write(")");
@@ -1954,7 +1964,7 @@ void CWriter::WriteTailCallFuncDeclaration(const std::string& mangled_name) {
 void CWriter::WriteImportFuncDeclaration(const FuncDeclaration& decl,
                                          const std::string& module_name,
                                          const std::string& name) {
-  Write(decl.sig.result_types, " ", name, "(");
+  Write("ggt_ret_t ", name, "(ggt_thread_t*, ", decl.sig.result_types, "*, ");
   Write("struct ", ModuleInstanceTypeName(module_name), "*");
   WriteParamTypes(decl);
   Write(")");
@@ -2241,7 +2251,7 @@ void CWriter::WriteDataInitializers() {
 
     for (const DataSegment* data_segment : module_->data_segments) {
       if (is_droppable(data_segment)) {
-        Write("instance->data_segment_dropped_",
+        Write("l->instance->data_segment_dropped_",
               GlobalName(ModuleFieldType::DataSegment, data_segment->name),
               " = false;", Newline());
       }
@@ -2387,7 +2397,7 @@ void CWriter::WriteElemInitializers() {
 
     for (const ElemSegment* elem_segment : module_->elem_segments) {
       if (is_droppable(elem_segment)) {
-        Write("instance->elem_segment_dropped_",
+        Write("l->instance->elem_segment_dropped_",
               GlobalName(ModuleFieldType::ElemSegment, elem_segment->name),
               " = false;", Newline());
       }
@@ -2425,7 +2435,7 @@ void CWriter::WriteElemTableInit(bool active_initialization,
     Write(", 0, ", src_segment->elem_exprs.size());
   } else {
     if (is_droppable(src_segment)) {
-      Write("(instance->elem_segment_dropped_",
+      Write("(l->instance->elem_segment_dropped_",
             GlobalName(ModuleFieldType::ElemSegment, src_segment->name),
             " ? 0 : ", src_segment->elem_exprs.size(), "), ");
     } else {
@@ -2486,7 +2496,8 @@ void CWriter::WriteExports(CWriterPhase kind) {
           local_syms_ = global_syms_;
           local_sym_map_.clear();
           stack_var_sym_map_.clear();
-          Write(func_->decl.sig.result_types, " ", mangled_name, "(");
+          Write("ggt_ret_t ", mangled_name, "(ggt_thread_t *thr, ",
+                func_->decl.sig.result_types, " *ret, ");
           MakeTypeBindingReverseMapping(func_->GetNumParamsAndLocals(),
                                         func_->bindings, &index_to_name);
           WriteParams(index_to_name);
@@ -2541,13 +2552,16 @@ void CWriter::WriteExports(CWriterPhase kind) {
         if (IsSingleUnsharedMemory()) {
           InstallSegueBase(module_->memories[0], true /* save_old_value */);
         }
+#if 0
         auto num_results = func_->GetNumResults();
         if (num_results > 1) {
           Write(func_->decl.sig.result_types, " ret = ");
         } else if (num_results == 1) {
           Write(func_->GetResultType(0), " ret = ");
         }
-        Write(ExternalRef(ModuleFieldType::Func, internal_name), "(");
+#endif
+        Write("return ");
+        Write(ExternalRef(ModuleFieldType::Func, internal_name), "(thr, ret, ");
 
         if (IsImport(internal_name)) {
           Write("instance->",
@@ -2560,9 +2574,11 @@ void CWriter::WriteExports(CWriterPhase kind) {
         if (IsSingleUnsharedMemory()) {
           RestoreSegueBase();
         }
+#if 0
         if (num_results > 0) {
           Write("return ret;", Newline());
         }
+#endif
         Write(CloseBrace(), Newline());
 
         local_sym_map_.clear();
@@ -3004,8 +3020,11 @@ void CWriter::Write(const Func& func) {
   Stream* prev_stream = stream_;
   BeginFunction(func);
   PushFuncSection();
-  Write(func.decl.sig.result_types, " ",
-        GlobalName(ModuleFieldType::Func, func.name), "(");
+  Write("GGT(",
+        GlobalName(ModuleFieldType::Func, func.name), ", (",
+        "ggt_thread_t *thr, ",
+        func.decl.sig.result_types, " *ret, "
+  );
   WriteParamsAndLocals();
   Write("FUNC_PROLOGUE;", Newline());
 
@@ -3024,12 +3043,13 @@ void CWriter::Write(const Func& func) {
   // Return the top of the stack implicitly.
   Index num_results = func.GetNumResults();
   if (num_results == 1) {
-    Write("return ", StackVar(0), ";", Newline());
+    Write("*l->ret = ", StackVar(0), ";", Newline());
   } else if (num_results >= 2) {
     Write(OpenBrace(), func.decl.sig.result_types, " tmp;", Newline());
     Spill(func.decl.sig.result_types);
-    Write("return tmp;", Newline(), CloseBrace(), Newline());
+    Write("*l->ret = tmp;", Newline(), CloseBrace(), Newline());
   }
+  Write("GGT_END();", Newline());
 
   stream_ = prev_stream;
   FinishFunction();
@@ -3045,7 +3065,7 @@ void CWriter::WriteVarsByType(const Vars& vars,
     size_t count = 0;
     for (const auto& var : vars) {
       if (typeoffunc(var) == type) {
-        if (count == 0) {
+        if (1 /*count == 0*/) {
           Write(type, " ");
           Indent(4);
         } else {
@@ -3056,12 +3076,35 @@ void CWriter::WriteVarsByType(const Vars& vars,
 
         todo(var_index, var);
         ++count;
+        Dedent(4);
+        Write(";", Newline());
       }
       ++var_index;
     }
+#if 0
     if (count != 0) {
       Dedent(4);
       Write(";", Newline());
+    }
+#endif
+  }
+}
+
+template <typename Vars, typename TypeOf, typename ToDo>
+void CWriter::WriteVarInits(const Vars& vars,
+                            const TypeOf& typeoffunc,
+                            const ToDo& todo) {
+  for (Type type : {Type::I32, Type::I64, Type::F32, Type::F64, Type::V128,
+                    Type::FuncRef, Type::ExternRef}) {
+    Index var_index = 0;
+    size_t count = 0;
+    for (const auto& var : vars) {
+      if (typeoffunc(var) == type) {
+        todo(var_index, var);
+        ++count;
+        Write(";", Newline());
+      }
+      ++var_index;
     }
   }
 }
@@ -3121,8 +3164,13 @@ void CWriter::WriteParamsAndLocals() {
   MakeTypeBindingReverseMapping(func_->GetNumParamsAndLocals(), func_->bindings,
                                 &index_to_name);
   WriteParams(index_to_name);
-  Write(" ", OpenBrace());
+  Write(", ", OpenBrace());
+  WriteLocalsParams(index_to_name);
   WriteLocals(index_to_name);
+  PushFuncSection();
+  Write(CloseBrace(), ", ", OpenBrace());
+  WriteArgTransfer(index_to_name);
+  Write(CloseBrace(), ") ", OpenBrace(), Newline());
 }
 
 void CWriter::WriteParams(const std::vector<std::string>& index_to_name) {
@@ -3149,7 +3197,8 @@ void CWriter::WriteParamSymbols(const std::vector<std::string>& index_to_name) {
       if (i != 0 && (i % 8) == 0) {
         Write(Newline());
       }
-      Write(ParamName(index_to_name[i]));
+      //Write(ParamName(index_to_name[i]));
+      Write(GetLocalName(index_to_name[i], false));
     }
     Dedent(4);
   }
@@ -3165,12 +3214,37 @@ void CWriter::WriteParamTypes(const FuncDeclaration& decl) {
   }
 }
 
+void CWriter::WriteLocalsParams(const std::vector<std::string>& index_to_name) {
+  Write(func_->decl.sig.result_types, " *ret;", Newline());
+  Write(ModuleInstanceTypeName(), "* instance;", Newline());
+  for (Index i = 0; i < func_->GetNumParams(); ++i) {
+    Write(func_->GetParamType(i), " ", GetLocalName(index_to_name[i], false),
+          ";", Newline());
+  }
+}
+
 void CWriter::WriteLocals(const std::vector<std::string>& index_to_name) {
   Index num_params = func_->GetNumParams();
   WriteVarsByType(
       func_->local_types, [](auto x) { return x; },
       [&](Index local_index, Type local_type) {
-        Write(DefineParamName(index_to_name[num_params + local_index]), " = ");
+        Write(DefineParamName(index_to_name[num_params + local_index]));
+      });
+}
+
+void CWriter::WriteArgTransfer(const std::vector<std::string>& index_to_name) {
+  Write("l->ret = ret;", Newline());
+  Write("l->instance = instance;", Newline());
+  for (Index i = 0; i < func_->GetNumParams(); ++i) {
+    Write("l->", GetLocalName(index_to_name[i], false), " = ",
+          GetLocalName(index_to_name[i], false), ";", Newline());
+  }
+
+  Index num_params = func_->GetNumParams();
+  WriteVarInits(
+      func_->local_types, [](auto x) { return x; },
+      [&](Index local_index, Type local_type) {
+        Write(ParamName(index_to_name[num_params + local_index]), " = ");
         if (local_type == Type::FuncRef || local_type == Type::ExternRef) {
           Write(GetReferenceNullValue(local_type));
         } else if (local_type == Type::V128) {
@@ -3418,24 +3492,32 @@ void CWriter::Write(const ExprList& exprs) {
         Index num_results = func.GetNumResults();
         assert(type_stack_.size() >= num_params);
         if (num_results > 1) {
-          Write(OpenBrace(), func.decl.sig.result_types, " tmp = ");
+          Write(OpenBrace(), func.decl.sig.result_types, " tmp;", Newline());
         } else if (num_results == 1) {
-          Write(StackVar(num_params - 1, func.GetResultType(0)), " = ");
+          //Write(StackVar(num_params - 1, func.GetResultType(0)), " = ");
         }
 
         assert(var.is_name());
-        Write(ExternalRef(ModuleFieldType::Func, var.name()), "(");
+        Write("GGT_CALL(");
+        Write(ExternalRef(ModuleFieldType::Func, var.name()), ", (thr, ");
+        if (num_results > 1) {
+          Write("&tmp, ");
+        } else if (num_results == 1) {
+          Write("&", StackVar(num_params - 1, func.GetResultType(0)), ", ");
+        } else {
+          Write("NULL, ");
+        }
         if (IsImport(func.name)) {
-          Write("instance->", GlobalName(ModuleFieldType::Import,
+          Write("l->instance->", GlobalName(ModuleFieldType::Import,
                                          import_module_sym_map_[func.name]));
         } else {
-          Write("instance");
+          Write("l->instance");
         }
         for (Index i = 0; i < num_params; ++i) {
           Write(", ");
           Write(StackVar(num_params - i - 1));
         }
-        Write(");", Newline());
+        Write("));", Newline());
         DropTypes(num_params);
         PushTypes(func.decl.sig.result_types);
         if (num_results > 1) {
@@ -3620,7 +3702,7 @@ void CWriter::Write(const ExprList& exprs) {
           Write("data_segment_data_",
                 GlobalName(ModuleFieldType::DataSegment, src_data->name), ", ");
           if (is_droppable(src_data)) {
-            Write("(", "instance->data_segment_dropped_",
+            Write("(", "l->instance->data_segment_dropped_",
                   GlobalName(ModuleFieldType::DataSegment, src_data->name),
                   " ? 0 : ", src_data->data.size(), ")");
           } else {
@@ -3648,7 +3730,7 @@ void CWriter::Write(const ExprList& exprs) {
         const auto inst = cast<DataDropExpr>(&expr);
         const DataSegment* data = module_->GetDataSegment(inst->var);
         if (is_droppable(data)) {
-          Write("instance->data_segment_dropped_",
+          Write("l->instance->data_segment_dropped_",
                 GlobalName(ModuleFieldType::DataSegment, data->name),
                 " = true;", Newline());
         }
@@ -3658,7 +3740,7 @@ void CWriter::Write(const ExprList& exprs) {
         const auto inst = cast<ElemDropExpr>(&expr);
         const ElemSegment* seg = module_->GetElemSegment(inst->var);
         if (is_droppable(seg)) {
-          Write("instance->elem_segment_dropped_",
+          Write("l->instance->elem_segment_dropped_",
                 GlobalName(ModuleFieldType::ElemSegment, seg->name), " = true;",
                 Newline());
         }
@@ -3747,10 +3829,10 @@ void CWriter::Write(const ExprList& exprs) {
         Write("}, ");
 
         if (IsImport(func->name)) {
-          Write("instance->", GlobalName(ModuleFieldType::Import,
+          Write("l->instance->", GlobalName(ModuleFieldType::Import,
                                          import_module_sym_map_[func->name]));
         } else {
-          Write("instance");
+          Write("l->instance");
         }
 
         Write("};", Newline());
