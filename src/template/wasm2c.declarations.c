@@ -309,6 +309,62 @@ static inline int I32_CTZ(unsigned long v) {
   return (int)r;
 }
 
+#undef POPCOUNT_DEFINE_PORTABLE
+
+#elif defined(__GNUC__)
+
+#define I32_CLZ(x) ((x) ? __builtin_clz(x) : 32)
+#define I64_CLZ(x) ((x) ? __builtin_clzll(x) : 64)
+#define I32_CTZ(x) ((x) ? __builtin_ctz(x) : 32)
+#define I64_CTZ(x) ((x) ? __builtin_ctzll(x) : 64)
+
+#else
+
+#define IX_CTZ(name, type, bits) \
+static int name ## _CTZ(type x) { \
+  int i; \
+  for (i = 0; i < (bits); i++) { \
+    if (x & 1) break; \
+    x >>= 1; \
+  } \
+  return i; \
+}
+
+#define REV(name, type, bits) \
+static type name ## _REV(type x) { \
+  type r = 0; \
+  int i; \
+  for (i = 0; i < (bits); i++) { \
+    r <<= 1; \
+    if (x & 1) r |= 1; \
+    i >>= 1; \
+  } \
+  return r; \
+}
+
+#define IX_CLZ(name, type) \
+static int name ## _CLZ(type x) { \
+  return name ## _CTZ(name ## _REV(x)); \
+}
+
+IX_CTZ(I32, uint32_t, 32)
+IX_CTZ(I64, uint64_t, 64)
+REV(I32, uint32_t, 32)
+REV(I64, uint64_t, 64)
+IX_CLZ(I32, uint32_t)
+IX_CLZ(I64, uint64_t)
+
+#undef IX_CTZ
+#undef REV
+#undef IX_CLZ
+
+#endif
+
+#if defined(__GNUC__)
+#define I32_POPCNT(x) (__builtin_popcount(x))
+#define I64_POPCNT(x) (__builtin_popcountll(x))
+
+#else
 #define POPCOUNT_DEFINE_PORTABLE(f_n, T)                            \
   static inline u32 f_n(T x) {                                      \
     x = x - ((x >> 1) & (T) ~(T)0 / 3);                             \
@@ -319,17 +375,6 @@ static inline int I32_CTZ(unsigned long v) {
 
 POPCOUNT_DEFINE_PORTABLE(I32_POPCNT, u32)
 POPCOUNT_DEFINE_PORTABLE(I64_POPCNT, u64)
-
-#undef POPCOUNT_DEFINE_PORTABLE
-
-#else
-
-#define I32_CLZ(x) ((x) ? __builtin_clz(x) : 32)
-#define I64_CLZ(x) ((x) ? __builtin_clzll(x) : 64)
-#define I32_CTZ(x) ((x) ? __builtin_ctz(x) : 32)
-#define I64_CTZ(x) ((x) ? __builtin_ctzll(x) : 64)
-#define I32_POPCNT(x) (__builtin_popcount(x))
-#define I64_POPCNT(x) (__builtin_popcountll(x))
 
 #endif
 
@@ -531,6 +576,7 @@ static float wasm_truncf(float x) {
 #endif
 }
 
+#if __STDC_VERSION__ >= 199901L
 static float wasm_nearbyintf(float x) {
   if (UNLIKELY(isnan(x))) {
     return quiet_nanf(x);
@@ -544,6 +590,7 @@ static double wasm_nearbyint(double x) {
   }
   return nearbyint(x);
 }
+#endif
 
 static float wasm_fabsf(float x) {
   if (UNLIKELY(isnan(x))) {
@@ -553,7 +600,11 @@ static float wasm_fabsf(float x) {
     wasm_rt_memcpy(&x, &tmp, 4);
     return x;
   }
+#if __STDC_VERSION__ >= 199901L
   return fabsf(x);
+#else
+  return fabs(x);
+#endif
 }
 
 static double wasm_fabs(double x) {
@@ -578,7 +629,11 @@ static float wasm_sqrtf(float x) {
   if (UNLIKELY(isnan(x))) {
     return quiet_nanf(x);
   }
+#if __STDC_VERSION__ >= 199901L
   return sqrtf(x);
+#else
+  return sqrt(x);
+#endif
 }
 
 static inline void memory_fill(wasm_rt_memory_t* mem, u64 d, u32 val, u64 n) {
@@ -624,20 +679,25 @@ static inline void funcref_table_init(wasm_rt_funcref_table_t* dest,
                                       u32 src_addr,
                                       u32 n,
                                       void* module_instance) {
+  u32 i;
+  const wasm_elem_segment_expr_t* src_expr;
+  wasm_rt_funcref_t* dest_val;
   if (UNLIKELY(src_addr + (uint64_t)n > src_size))
     TRAP(OOB);
   RANGE_CHECK(dest, dest_addr, n);
-  for (u32 i = 0; i < n; i++) {
+  for (i = 0; i < n; i++) {
     const wasm_elem_segment_expr_t* const src_expr = &src[src_addr + i];
     wasm_rt_funcref_t* const dest_val = &(dest->data[dest_addr + i]);
     switch (src_expr->expr_type) {
       case RefFunc:
-        *dest_val = (wasm_rt_funcref_t){
-            src_expr->type, src_expr->func, src_expr->func_tailcallee,
-            (char*)module_instance + src_expr->module_offset};
+        dest_val->func_type = src_expr->type;
+        dest_val->func = src_expr->func;
+        dest_val->func_tailcallee = src_expr->func_tailcallee;
+        dest_val->module_instance = (char *) module_instance +
+            src_expr->module_offset;
         break;
       case RefNull:
-        *dest_val = wasm_rt_funcref_null_value;
+        wasm_rt_funcref_nullify(dest_val);
         break;
       case GlobalGet:
         *dest_val = **(wasm_rt_funcref_t**)((char*)module_instance +
@@ -653,10 +713,11 @@ static inline void externref_table_init(wasm_rt_externref_table_t* dest,
                                         u64 dest_addr,
                                         u32 src_addr,
                                         u32 n) {
+  u32 i;
   if (UNLIKELY(src_addr + (uint64_t)n > src_size))
     TRAP(OOB);
   RANGE_CHECK(dest, dest_addr, n);
-  for (u32 i = 0; i < n; i++) {
+  for (i = 0; i < n; i++) {
     dest->data[dest_addr + i] = wasm_rt_externref_null_value;
   }
 }
@@ -700,6 +761,7 @@ DEFINE_TABLE_SET(externref)
   static inline void type##_table_fill(const wasm_rt_##type##_table_t* table, \
                                        u64 d, const wasm_rt_##type##_t val,   \
                                        u64 n) {                               \
+    uint32_t i;
     RANGE_CHECK(table, d, n);                                                 \
     for (uint32_t i = d; i < d + n; i++) {                                    \
       table->data[i] = val;                                                   \
