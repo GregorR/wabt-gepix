@@ -181,14 +181,18 @@ R"w2c_template(          func_types_eq(ft, table.data[x].func_type)) || \
 R"w2c_template(   TRAP(CALL_INDIRECT))
 )w2c_template"
 R"w2c_template(
-#define DO_CALL_INDIRECT(table, t, x, ...) ((t)table.data[x].func)(__VA_ARGS__)
+#define DO_CALL_INDIRECT(table, t, x, ...) \
+)w2c_template"
+R"w2c_template(    GGT_CALL(((t)table.data[x].func), (__VA_ARGS__))
 )w2c_template"
 R"w2c_template(
-#define CALL_INDIRECT(table, t, ft, x, ...) \
+#define CALL_INDIRECT(table, t, ft, x, ...) do { \
 )w2c_template"
-R"w2c_template(  (CHECK_CALL_INDIRECT(table, ft, x),       \
+R"w2c_template(  CHECK_CALL_INDIRECT(table, ft, x);             \
 )w2c_template"
-R"w2c_template(   DO_CALL_INDIRECT(table, t, x, __VA_ARGS__))
+R"w2c_template(  DO_CALL_INDIRECT(table, t, x, __VA_ARGS__);    \
+)w2c_template"
+R"w2c_template(} while (0)
 )w2c_template"
 R"w2c_template(
 #ifdef SUPPORT_MEMORY64
