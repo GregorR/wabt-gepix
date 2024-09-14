@@ -83,11 +83,13 @@ static inline bool func_types_eq(const wasm_rt_func_type_t a,
           func_types_eq(ft, table.data[x].func_type)) || \
    TRAP(CALL_INDIRECT))
 
-#define DO_CALL_INDIRECT(table, t, x, ...) ((t)table.data[x].func)(__VA_ARGS__)
+#define DO_CALL_INDIRECT(table, t, x, ...) \
+    GGT_CALL(((t)table.data[x].func), (__VA_ARGS__))
 
-#define CALL_INDIRECT(table, t, ft, x, ...) \
-  (CHECK_CALL_INDIRECT(table, ft, x),       \
-   DO_CALL_INDIRECT(table, t, x, __VA_ARGS__))
+#define CALL_INDIRECT(table, t, ft, x, ...) do { \
+  CHECK_CALL_INDIRECT(table, ft, x);             \
+  DO_CALL_INDIRECT(table, t, x, __VA_ARGS__);    \
+} while (0)
 
 static inline bool add_overflow(uint64_t a, uint64_t b, uint64_t* resptr) {
 #if __has_builtin(__builtin_add_overflow)

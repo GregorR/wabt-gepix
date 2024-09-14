@@ -2025,7 +2025,7 @@ void CWriter::WriteImportFuncDeclaration(const FuncDeclaration& decl,
 
 void CWriter::WriteCallIndirectFuncDeclaration(const FuncDeclaration& decl,
                                                const std::string& name) {
-  Write(decl.sig.result_types, " ", name, "(void*");
+  Write("ggt_ret_t ", name, "(ggt_thread_t*,", decl.sig.result_types, "*,void*");
   WriteParamTypes(decl);
   Write(")");
 }
@@ -3763,9 +3763,9 @@ void CWriter::Write(const ExprList& exprs) {
         Index num_results = decl.GetNumResults();
         assert(type_stack_.size() > num_params);
         if (num_results > 1) {
-          Write(OpenBrace(), decl.sig.result_types, " tmp = ");
+          Write(OpenBrace(), decl.sig.result_types, " tmp;", Newline());
         } else if (num_results == 1) {
-          Write(StackVar(num_params, decl.GetResultType(0)), " = ");
+          //Write(StackVar(num_params, decl.GetResultType(0)), " = ");
         }
 
         const Table* table =
@@ -3777,7 +3777,14 @@ void CWriter::Write(const ExprList& exprs) {
         Write("CALL_INDIRECT(",
               ExternalInstanceRef(ModuleFieldType::Table, table->name), ", ");
         WriteCallIndirectFuncDeclaration(decl, "(*)");
-        Write(", ", FuncTypeExpr(func_type), ", ", StackVar(0));
+        Write(", ", FuncTypeExpr(func_type), ", ", StackVar(0), ", thr, ");
+        if (num_results > 1) {
+          Write("&tmp");
+        } else if (num_results == 1) {
+          Write("&", StackVar(num_params, decl.GetResultType(0)));
+        } else {
+          Write("NULL");
+        }
         Write(", ", ExternalInstanceRef(ModuleFieldType::Table, table->name),
               ".data[", StackVar(0), "].module_instance");
         for (Index i = 0; i < num_params; ++i) {
