@@ -511,7 +511,108 @@ R"w2c_template(  return (int)r;
 R"w2c_template(}
 )w2c_template"
 R"w2c_template(
-#define POPCOUNT_DEFINE_PORTABLE(f_n, T)                            \
+#undef POPCOUNT_DEFINE_PORTABLE
+)w2c_template"
+R"w2c_template(
+#elif defined(__GNUC__)
+)w2c_template"
+R"w2c_template(
+#define I32_CLZ(x) ((x) ? __builtin_clz(x) : 32)
+)w2c_template"
+R"w2c_template(#define I64_CLZ(x) ((x) ? __builtin_clzll(x) : 64)
+)w2c_template"
+R"w2c_template(#define I32_CTZ(x) ((x) ? __builtin_ctz(x) : 32)
+)w2c_template"
+R"w2c_template(#define I64_CTZ(x) ((x) ? __builtin_ctzll(x) : 64)
+)w2c_template"
+R"w2c_template(
+#else
+)w2c_template"
+R"w2c_template(
+#define IX_CTZ(name, type, bits) \
+)w2c_template"
+R"w2c_template(static int name ## _CTZ(type x) { \
+)w2c_template"
+R"w2c_template(  int i; \
+)w2c_template"
+R"w2c_template(  for (i = 0; i < (bits); i++) { \
+)w2c_template"
+R"w2c_template(    if (x & 1) break; \
+)w2c_template"
+R"w2c_template(    x >>= 1; \
+)w2c_template"
+R"w2c_template(  } \
+)w2c_template"
+R"w2c_template(  return i; \
+)w2c_template"
+R"w2c_template(}
+)w2c_template"
+R"w2c_template(
+#define REV(name, type, bits) \
+)w2c_template"
+R"w2c_template(static type name ## _REV(type x) { \
+)w2c_template"
+R"w2c_template(  type r = 0; \
+)w2c_template"
+R"w2c_template(  int i; \
+)w2c_template"
+R"w2c_template(  for (i = 0; i < (bits); i++) { \
+)w2c_template"
+R"w2c_template(    r <<= 1; \
+)w2c_template"
+R"w2c_template(    if (x & 1) r |= 1; \
+)w2c_template"
+R"w2c_template(    i >>= 1; \
+)w2c_template"
+R"w2c_template(  } \
+)w2c_template"
+R"w2c_template(  return r; \
+)w2c_template"
+R"w2c_template(}
+)w2c_template"
+R"w2c_template(
+#define IX_CLZ(name, type) \
+)w2c_template"
+R"w2c_template(static int name ## _CLZ(type x) { \
+)w2c_template"
+R"w2c_template(  return name ## _CTZ(name ## _REV(x)); \
+)w2c_template"
+R"w2c_template(}
+)w2c_template"
+R"w2c_template(
+IX_CTZ(I32, uint32_t, 32)
+)w2c_template"
+R"w2c_template(IX_CTZ(I64, uint64_t, 64)
+)w2c_template"
+R"w2c_template(REV(I32, uint32_t, 32)
+)w2c_template"
+R"w2c_template(REV(I64, uint64_t, 64)
+)w2c_template"
+R"w2c_template(IX_CLZ(I32, uint32_t)
+)w2c_template"
+R"w2c_template(IX_CLZ(I64, uint64_t)
+)w2c_template"
+R"w2c_template(
+#undef IX_CTZ
+)w2c_template"
+R"w2c_template(#undef REV
+)w2c_template"
+R"w2c_template(#undef IX_CLZ
+)w2c_template"
+R"w2c_template(
+#endif
+)w2c_template"
+R"w2c_template(
+#if defined(__GNUC__)
+)w2c_template"
+R"w2c_template(#define I32_POPCNT(x) (__builtin_popcount(x))
+)w2c_template"
+R"w2c_template(#define I64_POPCNT(x) (__builtin_popcountll(x))
+)w2c_template"
+R"w2c_template(
+#else
+)w2c_template"
+R"w2c_template(#define POPCOUNT_DEFINE_PORTABLE(f_n, T)                            \
 )w2c_template"
 R"w2c_template(  static inline u32 f_n(T x) {                                      \
 )w2c_template"
@@ -529,25 +630,6 @@ R"w2c_template(
 POPCOUNT_DEFINE_PORTABLE(I32_POPCNT, u32)
 )w2c_template"
 R"w2c_template(POPCOUNT_DEFINE_PORTABLE(I64_POPCNT, u64)
-)w2c_template"
-R"w2c_template(
-#undef POPCOUNT_DEFINE_PORTABLE
-)w2c_template"
-R"w2c_template(
-#else
-)w2c_template"
-R"w2c_template(
-#define I32_CLZ(x) ((x) ? __builtin_clz(x) : 32)
-)w2c_template"
-R"w2c_template(#define I64_CLZ(x) ((x) ? __builtin_clzll(x) : 64)
-)w2c_template"
-R"w2c_template(#define I32_CTZ(x) ((x) ? __builtin_ctz(x) : 32)
-)w2c_template"
-R"w2c_template(#define I64_CTZ(x) ((x) ? __builtin_ctzll(x) : 64)
-)w2c_template"
-R"w2c_template(#define I32_POPCNT(x) (__builtin_popcount(x))
-)w2c_template"
-R"w2c_template(#define I64_POPCNT(x) (__builtin_popcountll(x))
 )w2c_template"
 R"w2c_template(
 #endif
@@ -932,7 +1014,9 @@ R"w2c_template(#endif
 R"w2c_template(}
 )w2c_template"
 R"w2c_template(
-static float wasm_nearbyintf(float x) {
+#if __STDC_VERSION__ >= 199901L
+)w2c_template"
+R"w2c_template(static float wasm_nearbyintf(float x) {
 )w2c_template"
 R"w2c_template(  if (UNLIKELY(isnan(x))) {
 )w2c_template"
@@ -957,6 +1041,8 @@ R"w2c_template(  return nearbyint(x);
 )w2c_template"
 R"w2c_template(}
 )w2c_template"
+R"w2c_template(#endif
+)w2c_template"
 R"w2c_template(
 static float wasm_fabsf(float x) {
 )w2c_template"
@@ -974,7 +1060,15 @@ R"w2c_template(    return x;
 )w2c_template"
 R"w2c_template(  }
 )w2c_template"
+R"w2c_template(#if __STDC_VERSION__ >= 199901L
+)w2c_template"
 R"w2c_template(  return fabsf(x);
+)w2c_template"
+R"w2c_template(#else
+)w2c_template"
+R"w2c_template(  return fabs(x);
+)w2c_template"
+R"w2c_template(#endif
 )w2c_template"
 R"w2c_template(}
 )w2c_template"
@@ -1021,7 +1115,15 @@ R"w2c_template(    return quiet_nanf(x);
 )w2c_template"
 R"w2c_template(  }
 )w2c_template"
+R"w2c_template(#if __STDC_VERSION__ >= 199901L
+)w2c_template"
 R"w2c_template(  return sqrtf(x);
+)w2c_template"
+R"w2c_template(#else
+)w2c_template"
+R"w2c_template(  return sqrt(x);
+)w2c_template"
+R"w2c_template(#endif
 )w2c_template"
 R"w2c_template(}
 )w2c_template"
@@ -1104,6 +1206,12 @@ R"w2c_template(                                      u32 n,
 )w2c_template"
 R"w2c_template(                                      void* module_instance) {
 )w2c_template"
+R"w2c_template(  u32 i;
+)w2c_template"
+R"w2c_template(  const wasm_elem_segment_expr_t* src_expr;
+)w2c_template"
+R"w2c_template(  wasm_rt_funcref_t* dest_val;
+)w2c_template"
 R"w2c_template(  if (UNLIKELY(src_addr + (uint64_t)n > src_size))
 )w2c_template"
 R"w2c_template(    TRAP(OOB);
@@ -1112,27 +1220,31 @@ R"w2c_template(  if (UNLIKELY(dest_addr + (uint64_t)n > dest->size))
 )w2c_template"
 R"w2c_template(    TRAP(OOB);
 )w2c_template"
-R"w2c_template(  for (u32 i = 0; i < n; i++) {
+R"w2c_template(  for (i = 0; i < n; i++) {
 )w2c_template"
-R"w2c_template(    const wasm_elem_segment_expr_t* const src_expr = &src[src_addr + i];
+R"w2c_template(    src_expr = &src[src_addr + i];
 )w2c_template"
-R"w2c_template(    wasm_rt_funcref_t* const dest_val = &(dest->data[dest_addr + i]);
+R"w2c_template(    dest_val = &(dest->data[dest_addr + i]);
 )w2c_template"
 R"w2c_template(    switch (src_expr->expr_type) {
 )w2c_template"
 R"w2c_template(      case RefFunc:
 )w2c_template"
-R"w2c_template(        *dest_val = (wasm_rt_funcref_t){
+R"w2c_template(        dest_val->func_type = src_expr->type;
 )w2c_template"
-R"w2c_template(            src_expr->type, src_expr->func, src_expr->func_tailcallee,
+R"w2c_template(        dest_val->func = src_expr->func;
 )w2c_template"
-R"w2c_template(            (char*)module_instance + src_expr->module_offset};
+R"w2c_template(        dest_val->func_tailcallee = src_expr->func_tailcallee;
+)w2c_template"
+R"w2c_template(        dest_val->module_instance = (char *) module_instance +
+)w2c_template"
+R"w2c_template(            src_expr->module_offset;
 )w2c_template"
 R"w2c_template(        break;
 )w2c_template"
 R"w2c_template(      case RefNull:
 )w2c_template"
-R"w2c_template(        *dest_val = wasm_rt_funcref_null_value;
+R"w2c_template(        wasm_rt_funcref_nullify(dest_val);
 )w2c_template"
 R"w2c_template(        break;
 )w2c_template"
@@ -1163,6 +1275,8 @@ R"w2c_template(                                        u32 src_addr,
 )w2c_template"
 R"w2c_template(                                        u32 n) {
 )w2c_template"
+R"w2c_template(  u32 i;
+)w2c_template"
 R"w2c_template(  if (UNLIKELY(src_addr + (uint64_t)n > src_size))
 )w2c_template"
 R"w2c_template(    TRAP(OOB);
@@ -1171,11 +1285,7 @@ R"w2c_template(  if (UNLIKELY(dest_addr + (uint64_t)n > dest->size))
 )w2c_template"
 R"w2c_template(    TRAP(OOB);
 )w2c_template"
-R"w2c_template(  for (u32 i = 0; i < n; i++) {
-)w2c_template"
-R"w2c_template(    dest->data[dest_addr + i] = wasm_rt_externref_null_value;
-)w2c_template"
-R"w2c_template(  }
+R"w2c_template(  memset((unsigned char *) dest->data + dest_addr, 0, n);
 )w2c_template"
 R"w2c_template(}
 )w2c_template"
@@ -1258,11 +1368,13 @@ R"w2c_template(                                       u32 d, const wasm_rt_##typ
 )w2c_template"
 R"w2c_template(                                       u32 n) {                               \
 )w2c_template"
+R"w2c_template(    uint32_t i;                                                               \
+)w2c_template"
 R"w2c_template(    if (UNLIKELY((uint64_t)d + n > table->size))                              \
 )w2c_template"
 R"w2c_template(      TRAP(OOB);                                                              \
 )w2c_template"
-R"w2c_template(    for (uint32_t i = d; i < d + n; i++) {                                    \
+R"w2c_template(    for (i = d; i < d + n; i++) {                                             \
 )w2c_template"
 R"w2c_template(      table->data[i] = val;                                                   \
 )w2c_template"
