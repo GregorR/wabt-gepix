@@ -23,6 +23,8 @@
 #include <windows.h>
 #elif _POSIX_VERSION >= 200112L
 #include <sys/mman.h>
+#elif defined(_M_I86) && !defined(_M_I386)
+#include <malloc.h>
 #endif
 
 #ifdef WASM_RT_GROW_FAILED_HANDLER

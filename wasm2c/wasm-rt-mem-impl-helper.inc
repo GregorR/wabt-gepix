@@ -99,6 +99,12 @@ void MEMORY_API_NAME(wasm_rt_allocate_memory)(MEMORY_TYPE* memory,
     memory->data_end = (MEMORY_CELL_TYPE)data_end;
     return;
   }
+
+#elif defined(_M_I86) && !defined(_M_I386)
+  memory->data = halloc(byte_length >> 4, 0x10);
+  memory->data_end = memory->data + byte_length;
+  return;
+
 #endif
 
   memory->data = (MEMORY_CELL_TYPE)calloc(byte_length, 1);
@@ -119,6 +125,19 @@ static int MEMORY_API_NAME(expand_data_allocation)(MEMORY_TYPE* memory,
                        delta_size);
 #endif
   }
+
+#elif defined(_M_I86) && !defined(_M_I386)
+  new_data = halloc(new_size>>4, 0x10);
+  if (new_data == NULL) {
+    return (uint64_t)-1;
+  }
+  memcpy(new_data, memory->data, old_size);
+  memset(new_data + old_size, 0, delta_size);
+  hfree(memory->data);
+  memory->data = (MEMORY_CELL_TYPE)new_data;
+  memory->data_end = memory->data + new_size;
+  return 0;
+
 #endif
 
   uint8_t* new_data = realloc((void*)memory->data, new_size);
@@ -185,6 +204,11 @@ void MEMORY_API_NAME(wasm_rt_free_memory)(MEMORY_TYPE* memory) {
     os_munmap((void*)memory->data, mmap_size);  // ignore error
     return;
   }
+
+#elif defined(_M_I86) && !defined(_M_I386)
+  hfree(memory->data);
+  return;
+
 #endif
   free((void*)memory->data);
 }
