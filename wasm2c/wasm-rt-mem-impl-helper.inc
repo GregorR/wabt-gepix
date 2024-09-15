@@ -88,6 +88,8 @@ void MEMORY_API_NAME(wasm_rt_allocate_memory)(MEMORY_TYPE* memory,
     abort();
   }
   memory->data = addr;
+#elif defined(_M_I86) && !defined(_M_I386)
+  memory->data = halloc(byte_length >> 4, 0x10);
 #else
   memory->data = calloc(byte_length, 1);
 #endif
@@ -114,6 +116,13 @@ static uint64_t MEMORY_API_NAME(grow_memory_impl)(MEMORY_TYPE* memory,
   if (ret != 0) {
     return (uint64_t)-1;
   }
+#elif defined(_M_I86) && !defined(_M_I386)
+  new_data = halloc(new_size>>4, 0x10);
+  if (new_data == NULL) {
+    return (uint64_t)-1;
+  }
+  memcpy(new_data, memory->data, old_size);
+  memset(new_data + old_size, 0, delta_size);
 #else
   new_data = realloc((void*)memory->data, new_size);
   if (new_data == NULL) {
@@ -151,6 +160,8 @@ void MEMORY_API_NAME(wasm_rt_free_memory)(MEMORY_TYPE* memory) {
   const uint64_t mmap_size =
       get_alloc_size_for_mmap(memory->max_pages, memory->is64);
   os_munmap((void*)memory->data, mmap_size);  // ignore error
+#elif defined(_M_I86) && !defined(_M_I386)
+  hfree(memory->data);
 #else
   free((void*)memory->data);
 #endif
