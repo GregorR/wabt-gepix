@@ -146,13 +146,21 @@ R"w2c_template(  return (a == b) || LIKELY(a && b && !memcmp(a, b, 32));
 R"w2c_template(}
 )w2c_template"
 R"w2c_template(
-#define CHECK_CALL_INDIRECT(table, ft, x)                \
+#if WASM_RT_NONCONFORMING_MEMCHECK_NONE
+)w2c_template"
+R"w2c_template(#define CHECK_CALL_INDIRECT(table, ft, x) (void) 0
+)w2c_template"
+R"w2c_template(#else
+)w2c_template"
+R"w2c_template(#define CHECK_CALL_INDIRECT(table, ft, x)                \
 )w2c_template"
 R"w2c_template(  (LIKELY((x) < table.size && table.data[x].func &&      \
 )w2c_template"
 R"w2c_template(          func_types_eq(ft, table.data[x].func_type)) || \
 )w2c_template"
 R"w2c_template(   TRAP(CALL_INDIRECT))
+)w2c_template"
+R"w2c_template(#endif
 )w2c_template"
 R"w2c_template(
 #define DO_CALL_INDIRECT(table, t, x, ...) \
@@ -238,7 +246,7 @@ R"w2c_template(#if WASM_RT_MEMCHECK_GUARD_PAGES
 )w2c_template"
 R"w2c_template(#define MEMCHECK_DEFAULT32(mem, a, t) WASM_RT_CHECK_BASE(mem);
 )w2c_template"
-R"w2c_template(#else
+R"w2c_template(#elif WASM_RT_MEMCHECK_BOUNDS_CHECK
 )w2c_template"
 R"w2c_template(#define MEMCHECK_DEFAULT32(mem, a, t)                \
 )w2c_template"
@@ -247,6 +255,10 @@ R"w2c_template(  WASM_RT_CHECK_BASE(mem);                           \
 R"w2c_template(  if (UNLIKELY(a + (uint64_t)sizeof(t) > mem->size)) \
 )w2c_template"
 R"w2c_template(    TRAP(OOB);
+)w2c_template"
+R"w2c_template(#else
+)w2c_template"
+R"w2c_template(#define MEMCHECK(mem, a, t) (void) 0
 )w2c_template"
 R"w2c_template(#endif
 )w2c_template"
@@ -434,6 +446,9 @@ R"w2c_template(                   sizeof(t1));                                  
 R"w2c_template(  }                                                                    \
 )w2c_template"
 R"w2c_template(  DEF_MEM_CHECKS1(name, _, t1, , void, t2)
+)w2c_template"
+R"w2c_template(
+#endif
 )w2c_template"
 R"w2c_template(
 DEFINE_LOAD(i32_load, u32, u32, u32, FORCE_READ_INT)

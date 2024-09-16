@@ -78,10 +78,14 @@ static inline bool func_types_eq(const wasm_rt_func_type_t a,
   return (a == b) || LIKELY(a && b && !memcmp(a, b, 32));
 }
 
+#if WASM_RT_NONCONFORMING_MEMCHECK_NONE
+#define CHECK_CALL_INDIRECT(table, ft, x) (void) 0
+#else
 #define CHECK_CALL_INDIRECT(table, ft, x)                \
   (LIKELY((x) < table.size && table.data[x].func &&      \
           func_types_eq(ft, table.data[x].func_type)) || \
    TRAP(CALL_INDIRECT))
+#endif
 
 #define DO_CALL_INDIRECT(table, t, x, ...) \
     GGT_CALL(((t)table.data[x].func), (__VA_ARGS__))
@@ -101,6 +105,9 @@ static inline bool add_overflow(uint64_t a, uint64_t b, uint64_t* resptr) {
 #endif
 }
 
+#if WASM_RT_NONCONFORMING_MEMCHECK_NONE
+#define RANGE_CHECK(mem, offset, len) (void) 0
+#else
 #define RANGE_CHECK(mem, offset, len)              \
   do {                                             \
     uint64_t res;                                  \
@@ -109,6 +116,7 @@ static inline bool add_overflow(uint64_t a, uint64_t b, uint64_t* resptr) {
     if (UNLIKELY(res > (mem)->size))               \
       TRAP(OOB);                                   \
   } while (0);
+#endif
 
 #if WASM_RT_USE_SEGUE_FOR_THIS_MODULE && WASM_RT_SANITY_CHECKS
 #include <stdio.h>
@@ -127,17 +135,23 @@ static inline bool add_overflow(uint64_t a, uint64_t b, uint64_t* resptr) {
 // or it may do a slightly faster RANGE_CHECK.
 #if WASM_RT_MEMCHECK_GUARD_PAGES
 #define MEMCHECK_DEFAULT32(mem, a, t) WASM_RT_CHECK_BASE(mem);
-#else
+#elif WASM_RT_MEMCHECK_BOUNDS_CHECK
 #define MEMCHECK_DEFAULT32(mem, a, t)                \
   WASM_RT_CHECK_BASE(mem);                           \
   if (UNLIKELY(a + (uint64_t)sizeof(t) > mem->size)) \
     TRAP(OOB);
+#else
+#define MEMCHECK_DEFAULT32(mem, a, t) (void) 0
 #endif
 
 // MEMCHECK_GENERAL can be used for any memory
+#if WASM_RT_NONCONFORMING_MEMCHECK_NONE
+#define MEMCHECK_GENERAL(mem, a, t) (void) 0
+#else
 #define MEMCHECK_GENERAL(mem, a, t) \
   WASM_RT_CHECK_BASE(mem);          \
   RANGE_CHECK(mem, a, sizeof(t));
+#endif
 
 #ifdef __GNUC__
 #define FORCE_READ_INT(var) __asm__("" ::"r"(var));
@@ -230,6 +244,8 @@ static inline void load_data(u8* dest, const u8* src, size_t n) {
                    sizeof(t1));                                        \
   }                                                                    \
   DEF_MEM_CHECKS1(name, _, t1, , void, t2)
+
+#endif
 
 DEFINE_LOAD(i32_load, u32, u32, u32, FORCE_READ_INT)
 DEFINE_LOAD(i64_load, u64, u64, u64, FORCE_READ_INT)
