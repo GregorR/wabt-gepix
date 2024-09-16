@@ -90,10 +90,14 @@ static inline bool func_types_eq(const wasm_rt_func_type_t a,
   return (a == b) || LIKELY(a && b && !memcmp(a, b, 32));
 }
 
+#if WASM_RT_NONCONFORMING_MEMCHECK_NONE
+#define CHECK_CALL_INDIRECT(table, ft, x) (void) 0
+#else
 #define CHECK_CALL_INDIRECT(table, ft, x)                \
   (LIKELY((x) < table.size && table.data[x].func &&      \
           func_types_eq(ft, table.data[x].func_type)) || \
    TRAP(CALL_INDIRECT))
+#endif
 
 #define DO_CALL_INDIRECT(table, t, x, ...) \
     GGT_CALL(((t)table.data[x].func), (__VA_ARGS__))
@@ -103,6 +107,9 @@ static inline bool func_types_eq(const wasm_rt_func_type_t a,
   DO_CALL_INDIRECT(table, t, x, __VA_ARGS__);    \
 } while (0)
 
+#if WASM_RT_NONCONFORMING_MEMCHECK_NONE
+#define RANGE_CHECK(mem, offset, len) (void) 0
+#else
 #ifdef SUPPORT_MEMORY64
 #define RANGE_CHECK(mem, offset, len)              \
   do {                                             \
@@ -116,6 +123,7 @@ static inline bool func_types_eq(const wasm_rt_func_type_t a,
 #define RANGE_CHECK(mem, offset, len)               \
   if (UNLIKELY(offset + (uint64_t)len > mem->size)) \
     TRAP(OOB);
+#endif
 #endif
 
 #if WASM_RT_USE_SEGUE && WASM_RT_SANITY_CHECKS
@@ -131,10 +139,12 @@ static inline bool func_types_eq(const wasm_rt_func_type_t a,
 
 #if WASM_RT_MEMCHECK_GUARD_PAGES
 #define MEMCHECK(mem, a, t) WASM_RT_CHECK_BASE(mem);
-#else
+#elif WASM_RT_MEMCHECK_BOUNDS_CHECK
 #define MEMCHECK(mem, a, t) \
   WASM_RT_CHECK_BASE(mem);  \
   RANGE_CHECK(mem, a, sizeof(t))
+#else
+#define MEMCHECK(mem, a, t) (void) 0
 #endif
 
 #ifdef __GNUC__
@@ -173,6 +183,18 @@ static inline void load_data(void* dest, const void* src, size_t n) {
     load_data(MEM_ADDR(&m, o, s), i, s); \
   } while (0)
 
+#if WASM_RT_NONCONFORMING_MEMCHECK_NONE
+#define DEFINE_LOAD(name, t1, t2, t3, force_read)                     \
+  static inline t3 name(wasm_rt_memory_t* mem, size_t addr) {         \
+    return (t3) (t2) *((t1 *) MEM_ADDR_MEMOP(mem, addr, sizeof(t1))); \
+  }
+
+#define DEFINE_STORE(name, t1, t2)                                        \
+  static inline void name(wasm_rt_memory_t* mem, size_t addr, t2 value) { \
+    *((t1 *) MEM_ADDR_MEMOP(mem, addr, sizeof(t1))) = (t1) value;         \
+  }
+
+#else
 #define DEFINE_LOAD(name, t1, t2, t3, force_read)                  \
   static inline t3 name(wasm_rt_memory_t* mem, u64 addr) {         \
     t1 result;                                                     \
@@ -190,6 +212,8 @@ static inline void load_data(void* dest, const void* src, size_t n) {
     wasm_rt_memcpy(MEM_ADDR_MEMOP(mem, addr, sizeof(t1)), &wrapped,    \
                    sizeof(t1));                                        \
   }
+
+#endif
 
 DEFINE_LOAD(i32_load, u32, u32, u32, FORCE_READ_INT)
 DEFINE_LOAD(i64_load, u64, u64, u64, FORCE_READ_INT)
