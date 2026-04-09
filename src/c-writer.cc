@@ -3360,7 +3360,8 @@ void CWriter::WriteLocals(const std::vector<std::string>& index_to_name) {
       func_->local_types, [](auto x) { return x; },
       [&](Index local_index, Type local_type) {
         Write(DefineParamName(index_to_name[num_params + local_index]));
-      });
+      },
+      true);
 }
 
 void CWriter::WriteArgTransfer(const std::vector<std::string>& index_to_name) {
@@ -3383,8 +3384,7 @@ void CWriter::WriteArgTransfer(const std::vector<std::string>& index_to_name) {
         } else {
           Write("0");
         }
-      },
-      true);
+      });
 }
 
 void CWriter::WriteStackVarDeclarations() {

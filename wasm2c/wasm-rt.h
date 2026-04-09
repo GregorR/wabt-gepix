@@ -159,10 +159,12 @@ extern "C" {
 #endif
 
 /** Specify defaults for memory checks if unspecified */
+#if 0
 #if !defined(WASM_RT_MEMCHECK_GUARD_PAGES) && \
     !defined(WASM_RT_MEMCHECK_BOUNDS_CHECK)
 #if WASM_RT_GUARD_PAGES_SUPPORTED
 #define WASM_RT_MEMCHECK_GUARD_PAGES 1
+#endif
 #endif
 #endif
 
