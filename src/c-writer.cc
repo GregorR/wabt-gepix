@@ -1125,8 +1125,9 @@ void CWriter::Write(std::string_view s) {
 }
 
 void CWriter::Write(const ParamName& name) {
-  Write("l->");
+  Write("GGT_L(");
   Write(GetLocalName(name.name, false));
+  Write(")");
 }
 
 void CWriter::Write(const LabelName& name) {
@@ -1149,8 +1150,10 @@ void CWriter::Write(const ExternalInstancePtr& name) {
     Write("&");
   }
   if (func_)
-    Write("l->");
+    Write("GGT_L(");
   Write("instance->", GlobalName(name));
+  if (func_)
+      Write(")");
 }
 
 void CWriter::Write(const ExternalRef& name) {
@@ -1171,9 +1174,9 @@ void CWriter::Write(const TailCallRef& name) {
 
 void CWriter::Write(const ExternalInstanceRef& name) {
   if (IsImport(name.name)) {
-    Write("(*", (func_ ? "l->" : ""), "instance->", GlobalName(name), ")");
+    Write("(*", (func_ ? "GGT_L(" : ""), "instance->", GlobalName(name), (func_ ? ")" : ""), ")");
   } else {
-    Write((func_ ? "l->" : ""), "instance->", GlobalName(name));
+    Write((func_ ? "GGT_L(" : ""), "instance->", GlobalName(name), (func_ ? ")" : ""));
   }
 }
 
@@ -1223,7 +1226,7 @@ void CWriter::Write(const StackVar& sv) {
     type = type_stack_[index];
   }
 
-  Write("l->");
+  Write("GGT_L(");
 
   StackTypePair stp = {index, type};
   auto iter = stack_var_sym_map_.find(stp);
@@ -1233,6 +1236,8 @@ void CWriter::Write(const StackVar& sv) {
   } else {
     Write(iter->second);
   }
+
+  Write(")");
 }
 
 // static
@@ -1517,10 +1522,10 @@ void CWriter::WriteInitExprTerminal(const Expr* expr) {
       Write("}, ");
 
       if (IsImport(func->name)) {
-        Write("l->instance->", GlobalName(ModuleFieldType::Import,
+        Write("GGT_L(instance)->", GlobalName(ModuleFieldType::Import,
                                        import_module_sym_map_[func->name]));
       } else {
-        Write("l->instance");
+        Write("GGT_L(instance)");
       }
       Write("}");
     } break;
@@ -2303,7 +2308,7 @@ void CWriter::WriteDataInitializers() {
 
     for (const DataSegment* data_segment : module_->data_segments) {
       if (is_droppable(data_segment)) {
-        Write("l->instance->data_segment_dropped_",
+        Write("GGT_L(instance)->data_segment_dropped_",
               GlobalName(ModuleFieldType::DataSegment, data_segment->name),
               " = false;", Newline());
       }
@@ -2503,7 +2508,7 @@ void CWriter::WriteElemInitializers() {
 
     for (const ElemSegment* elem_segment : module_->elem_segments) {
       if (is_droppable(elem_segment)) {
-        Write("l->instance->elem_segment_dropped_",
+        Write("GGT_L(instance)->elem_segment_dropped_",
               GlobalName(ModuleFieldType::ElemSegment, elem_segment->name),
               " = false;", Newline());
       }
@@ -2542,7 +2547,7 @@ void CWriter::WriteElemTableInit(bool active_initialization,
     Write(", 0, ", src_segment->elem_exprs.size());
   } else {
     if (is_droppable(src_segment)) {
-      Write("(l->instance->elem_segment_dropped_",
+      Write("(GGT_L(instance)->elem_segment_dropped_",
             GlobalName(ModuleFieldType::ElemSegment, src_segment->name),
             " ? 0 : ", src_segment->elem_exprs.size(), "), ");
     } else {
@@ -3160,11 +3165,11 @@ void CWriter::Write(const Func& func) {
   // Return the top of the stack implicitly.
   Index num_results = func.GetNumResults();
   if (num_results == 1) {
-    Write("*l->ret = ", StackVar(0), ";", Newline());
+    Write("*GGT_L(ret) = ", StackVar(0), ";", Newline());
   } else if (num_results >= 2) {
     Write(OpenBrace(), func.decl.sig.result_types, " tmp;", Newline());
     Spill(func.decl.sig.result_types);
-    Write("*l->ret = tmp;", Newline(), CloseBrace(), Newline());
+    Write("*GGT_L(ret) = tmp;", Newline(), CloseBrace(), Newline());
   }
   Write("GGT_END();", Newline());
 
@@ -3365,10 +3370,10 @@ void CWriter::WriteLocals(const std::vector<std::string>& index_to_name) {
 }
 
 void CWriter::WriteArgTransfer(const std::vector<std::string>& index_to_name) {
-  Write("l->ret = ret;", Newline());
-  Write("l->instance = instance;", Newline());
+  Write("GGT_L(ret) = ret;", Newline());
+  Write("GGT_L(instance) = instance;", Newline());
   for (Index i = 0; i < func_->GetNumParams(); ++i) {
-    Write("l->", GetLocalName(index_to_name[i], false), " = ",
+    Write("GGT_L(", GetLocalName(index_to_name[i], false), ") = ",
           GetLocalName(index_to_name[i], false), ";", Newline());
   }
 
@@ -3738,10 +3743,10 @@ void CWriter::Write(const ExprList& exprs) {
           Write("NULL, ");
         }
         if (IsImport(func.name)) {
-          Write("l->instance->", GlobalName(ModuleFieldType::Import,
+          Write("GGT_L(instance)->", GlobalName(ModuleFieldType::Import,
                                          import_module_sym_map_[func.name]));
         } else {
-          Write("l->instance");
+          Write("GGT_L(instance)");
         }
         for (Index i = 0; i < num_params; ++i) {
           Write(", ");
@@ -3942,7 +3947,7 @@ void CWriter::Write(const ExprList& exprs) {
           Write("data_segment_data_",
                 GlobalName(ModuleFieldType::DataSegment, src_data->name), ", ");
           if (is_droppable(src_data)) {
-            Write("(", "l->instance->data_segment_dropped_",
+            Write("(", "GGT_L(instance)->data_segment_dropped_",
                   GlobalName(ModuleFieldType::DataSegment, src_data->name),
                   " ? 0 : ", src_data->data.size(), ")");
           } else {
@@ -3970,7 +3975,7 @@ void CWriter::Write(const ExprList& exprs) {
         const auto inst = cast<DataDropExpr>(&expr);
         const DataSegment* data = module_->GetDataSegment(inst->var);
         if (is_droppable(data)) {
-          Write("l->instance->data_segment_dropped_",
+          Write("GGT_L(instance)->data_segment_dropped_",
                 GlobalName(ModuleFieldType::DataSegment, data->name),
                 " = true;", Newline());
         }
@@ -3980,7 +3985,7 @@ void CWriter::Write(const ExprList& exprs) {
         const auto inst = cast<ElemDropExpr>(&expr);
         const ElemSegment* seg = module_->GetElemSegment(inst->var);
         if (is_droppable(seg)) {
-          Write("l->instance->elem_segment_dropped_",
+          Write("GGT_L(instance)->elem_segment_dropped_",
                 GlobalName(ModuleFieldType::ElemSegment, seg->name), " = true;",
                 Newline());
         }
@@ -4072,10 +4077,10 @@ void CWriter::Write(const ExprList& exprs) {
         Write("}, ");
 
         if (IsImport(func->name)) {
-          Write("l->instance->", GlobalName(ModuleFieldType::Import,
+          Write("GGT_L(instance)->", GlobalName(ModuleFieldType::Import,
                                          import_module_sym_map_[func->name]));
         } else {
-          Write("l->instance");
+          Write("GGT_L(instance)");
         }
 
         Write("};", Newline());

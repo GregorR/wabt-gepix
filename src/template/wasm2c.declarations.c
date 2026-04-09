@@ -239,13 +239,10 @@ static inline void load_data(u8* dest, const u8* src, size_t n) {
   static inline void name##_unchecked(wasm_rt_memory_t* mem, u64 addr, \
                                       t2 value) {                      \
     t1 wrapped = (t1)value;                                            \
-    MEMCHECK(mem, addr, t1);                                           \
     wasm_rt_memcpy(MEM_ADDR_MEMOP(mem, addr, sizeof(t1)), &wrapped,    \
                    sizeof(t1));                                        \
   }                                                                    \
   DEF_MEM_CHECKS1(name, _, t1, , void, t2)
-
-#endif
 
 DEFINE_LOAD(i32_load, u32, u32, u32, FORCE_READ_INT)
 DEFINE_LOAD(i64_load, u64, u64, u64, FORCE_READ_INT)
@@ -779,7 +776,7 @@ DEFINE_TABLE_SET(externref)
   static inline void type##_table_fill(const wasm_rt_##type##_table_t* table, \
                                        u64 d, const wasm_rt_##type##_t val,   \
                                        u64 n) {                               \
-    uint32_t i;
+    uint32_t i;                                                               \
     RANGE_CHECK(table, d, n);                                                 \
     for (uint32_t i = d; i < d + n; i++) {                                    \
       table->data[i] = val;                                                   \
