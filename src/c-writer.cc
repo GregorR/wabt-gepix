@@ -3293,13 +3293,13 @@ void CWriter::WriteParamsAndLocals() {
   MakeTypeBindingReverseMapping(func_->GetNumParamsAndLocals(), func_->bindings,
                                 &index_to_name);
   WriteParams(index_to_name, true);
-  Write(", ", OpenBrace());
+  Write(", ", Newline());
   WriteLocalsParams(index_to_name);
   WriteLocals(index_to_name);
   PushFuncSection();
-  Write(CloseBrace(), ", ", OpenBrace());
+  Write(", ", Newline());
   WriteArgTransfer(index_to_name);
-  Write(CloseBrace(), ") ", OpenBrace(), Newline());
+  Write(") ", OpenBrace(), Newline());
 }
 
 void CWriter::WriteParams(const std::vector<std::string>& index_to_name,
@@ -3351,11 +3351,11 @@ void CWriter::WriteParamTypes(const FuncDeclaration& decl) {
 }
 
 void CWriter::WriteLocalsParams(const std::vector<std::string>& index_to_name) {
-  Write(func_->decl.sig.result_types, " *ret;", Newline());
-  Write(ModuleInstanceTypeName(), "* instance;", Newline());
+  Write("GGT_P(", func_->decl.sig.result_types, " *, ret)", Newline());
+  Write("GGT_P(", ModuleInstanceTypeName(), "*, instance)", Newline());
   for (Index i = 0; i < func_->GetNumParams(); ++i) {
-    Write(func_->GetParamType(i), " ", GetLocalName(index_to_name[i], false),
-          ";", Newline());
+    Write("GGT_P(", func_->GetParamType(i), ", ", GetLocalName(index_to_name[i], false),
+          ")", Newline());
   }
 }
 
@@ -3370,11 +3370,10 @@ void CWriter::WriteLocals(const std::vector<std::string>& index_to_name) {
 }
 
 void CWriter::WriteArgTransfer(const std::vector<std::string>& index_to_name) {
-  Write("GGT_L(ret) = ret;", Newline());
-  Write("GGT_L(instance) = instance;", Newline());
+  Write("GGT_T(ret);", Newline());
+  Write("GGT_T(instance);", Newline());
   for (Index i = 0; i < func_->GetNumParams(); ++i) {
-    Write("GGT_L(", GetLocalName(index_to_name[i], false), ") = ",
-          GetLocalName(index_to_name[i], false), ";", Newline());
+    Write("GGT_T(", GetLocalName(index_to_name[i], false), ");", Newline());
   }
 
   Index num_params = func_->GetNumParams();
