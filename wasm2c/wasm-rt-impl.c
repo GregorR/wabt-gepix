@@ -85,7 +85,7 @@ WASM_RT_THREAD_LOCAL wasm_rt_jmp_buf g_wasm_rt_jmp_buf;
 extern void WASM_RT_TRAP_HANDLER(wasm_rt_trap_t code);
 #endif
 
-void wasm_rt_trap(wasm_rt_trap_t code) {
+void WASM_RT_EXPORT wasm_rt_trap(wasm_rt_trap_t code) {
   assert(code != WASM_RT_TRAP_NONE);
 #if WASM_RT_STACK_DEPTH_COUNT
   wasm_rt_call_stack_depth = wasm_rt_saved_call_stack_depth;

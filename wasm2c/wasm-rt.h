@@ -30,7 +30,7 @@
 
 #if defined(__WINDOWS__) || defined(_WIN16) || defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
-#define WASM_RT_EXPORT __declspec(dllexport) WINAPI
+#define WASM_RT_EXPORT __declspec(dllexport)
 #else
 #define WASM_RT_EXPORT
 #endif

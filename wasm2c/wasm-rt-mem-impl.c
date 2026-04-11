@@ -61,16 +61,17 @@ static void* os_mmap(size_t size) {
 
 static int os_munmap(void* addr, size_t size) {
   // Windows can only unmap the whole mapping
-  (void)size; /* unused */
   BOOL succeeded = VirtualFree(addr, 0, MEM_RELEASE);
+  (void)size; /* unused */
   return succeeded ? 0 : -1;
 }
 
 static int os_mprotect(void* addr, size_t size) {
+  void *ret;
   if (size == 0) {
     return 0;
   }
-  void* ret = VirtualAlloc(addr, size, MEM_COMMIT, PAGE_READWRITE);
+  ret = VirtualAlloc(addr, size, MEM_COMMIT, PAGE_READWRITE);
   if (ret == addr) {
     return 0;
   }
@@ -129,13 +130,13 @@ static uint64_t get_alloc_size_for_mmap_default32(uint64_t max_pages) {
   const uint64_t max_size = 0x200000000ul;
   return max_size;
 #else
+  const uint64_t max_size = 0x100000000ul;
   if (max_pages != 0) {
     const uint64_t max_size = max_pages * WASM_DEFAULT_PAGE_SIZE;
     return max_size;
   }
 
   /* Reserve 4GiB. */
-  const uint64_t max_size = 0x100000000ul;
   return max_size;
 #endif
 }

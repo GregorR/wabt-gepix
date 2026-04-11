@@ -78,6 +78,8 @@ void MEMORY_API_NAME(wasm_rt_allocate_memory)(MEMORY_TYPE* memory,
 
 #if WASM_RT_USE_MMAP
   if (MEMORY_API_NAME(wasm_rt_memory_is_default32)(memory)) {
+    uint8_t *data_end;
+    int ret;
     const uint64_t mmap_size =
         get_alloc_size_for_mmap_default32(memory->max_pages);
     uint8_t* addr = os_mmap(mmap_size);
@@ -85,11 +87,11 @@ void MEMORY_API_NAME(wasm_rt_allocate_memory)(MEMORY_TYPE* memory,
       os_print_last_error("os_mmap failed.");
       abort();
     }
-    uint8_t* data_end = addr + mmap_size;
+    data_end = addr + mmap_size;
 #if !WABT_BIG_ENDIAN
-    int ret = os_mprotect(addr, byte_length);
+    ret = os_mprotect(addr, byte_length);
 #else
-    int ret = os_mprotect(data_end - byte_length, byte_length);
+    ret = os_mprotect(data_end - byte_length, byte_length);
 #endif
     if (ret != 0) {
       os_print_last_error("os_mprotect failed.");
