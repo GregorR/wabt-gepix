@@ -252,7 +252,7 @@ static void call_cpuid(uint64_t* rax,
 }
 #endif
 
-void wasm_rt_init(void) {
+void WASM_RT_EXPORT wasm_rt_init(void) {
   wasm_rt_init_thread();
 #if WASM_RT_INSTALL_SIGNAL_HANDLER
   if (!g_signal_handler_installed) {
@@ -289,7 +289,7 @@ void wasm_rt_init(void) {
   assert(wasm_rt_is_initialized());
 }
 
-bool wasm_rt_is_initialized(void) {
+bool WASM_RT_EXPORT wasm_rt_is_initialized(void) {
 #if WASM_RT_STACK_EXHAUSTION_HANDLER
   if (!os_has_altstack_installed()) {
     return false;
@@ -302,7 +302,7 @@ bool wasm_rt_is_initialized(void) {
 #endif
 }
 
-void wasm_rt_free(void) {
+void WASM_RT_EXPORT wasm_rt_free(void) {
   assert(wasm_rt_is_initialized());
 #if WASM_RT_INSTALL_SIGNAL_HANDLER
   os_cleanup_signal_handler();
@@ -311,13 +311,13 @@ void wasm_rt_free(void) {
   wasm_rt_free_thread();
 }
 
-void wasm_rt_init_thread(void) {
+void WASM_RT_EXPORT wasm_rt_init_thread(void) {
 #if WASM_RT_STACK_EXHAUSTION_HANDLER
   os_allocate_and_install_altstack();
 #endif
 }
 
-void wasm_rt_free_thread(void) {
+void WASM_RT_EXPORT wasm_rt_free_thread(void) {
 #if WASM_RT_STACK_EXHAUSTION_HANDLER
   os_disable_and_deallocate_altstack();
 #endif

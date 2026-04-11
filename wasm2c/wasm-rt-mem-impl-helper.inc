@@ -116,6 +116,8 @@ static int MEMORY_API_NAME(expand_data_allocation)(MEMORY_TYPE* memory,
                                                    uint64_t old_size,
                                                    uint64_t new_size,
                                                    uint64_t delta_size) {
+  uint8_t *new_data;
+
 #if WASM_RT_USE_MMAP
   if (MEMORY_API_NAME(wasm_rt_memory_is_default32)(memory)) {
 #if !WABT_BIG_ENDIAN
@@ -140,7 +142,7 @@ static int MEMORY_API_NAME(expand_data_allocation)(MEMORY_TYPE* memory,
 
 #endif
 
-  uint8_t* new_data = realloc((void*)memory->data, new_size);
+  new_data = realloc((void*)memory->data, new_size);
   if (new_data == NULL) {
     return -1;
   }
@@ -161,6 +163,7 @@ static uint64_t MEMORY_API_NAME(grow_memory_impl)(MEMORY_TYPE* memory,
   uint64_t old_pages = memory->pages;
   uint64_t new_pages = memory->pages + delta;
   uint64_t old_size, new_size, delta_size;
+  int err;
   if (new_pages == 0) {
     return 0;
   }
@@ -171,7 +174,7 @@ static uint64_t MEMORY_API_NAME(grow_memory_impl)(MEMORY_TYPE* memory,
   new_size = new_pages * memory->page_size;
   delta_size = delta * memory->page_size;
 
-  int err = MEMORY_API_NAME(expand_data_allocation)(memory, old_size, new_size,
+  err = MEMORY_API_NAME(expand_data_allocation)(memory, old_size, new_size,
                                                     delta_size);
   if (err != 0) {
     return (uint64_t)-1;

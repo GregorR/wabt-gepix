@@ -381,7 +381,7 @@ class CWriter {
   void WriteImports();
   void WriteTailCallWeakImports();
   void WriteFuncDeclarations();
-  void WriteFuncDeclaration(const FuncDeclaration&, const std::string&);
+  void WriteFuncDeclaration(const FuncDeclaration&, const std::string&, bool);
   void WriteTailCallFuncDeclaration(const std::string&);
   void WriteImportFuncDeclaration(const FuncDeclaration&,
                                   const std::string& module_name,
@@ -1379,7 +1379,7 @@ void CWriter::Write(const Const& const_) {
 }
 
 void CWriter::WriteInitDecl() {
-  Write("void ", kAdminSymbolPrefix, module_prefix_, "_instantiate(",
+  Write("void GEPIX_EXPORT ", kAdminSymbolPrefix, module_prefix_, "_instantiate(",
         ModuleInstanceTypeName(), "*");
   for (const auto& import_module_name : import_module_set_) {
     Write(", struct ", ModuleInstanceTypeName(import_module_name), "*");
@@ -1991,7 +1991,7 @@ void CWriter::WriteFuncDeclarations() {
     if (!is_import) {
       Write(InternalSymbolScope());
       WriteFuncDeclaration(
-          func->decl, DefineGlobalScopeName(ModuleFieldType::Func, func->name));
+          func->decl, DefineGlobalScopeName(ModuleFieldType::Func, func->name), false);
       Write(";", Newline());
 
       if (func->features_used.tailcall) {
@@ -2005,8 +2005,9 @@ void CWriter::WriteFuncDeclarations() {
 }
 
 void CWriter::WriteFuncDeclaration(const FuncDeclaration& decl,
-                                   const std::string& name) {
-  Write("ggt_ret_t ", name, "(ggt_thread_t*, ",
+                                   const std::string& name,
+                                   bool isExport) {
+  Write("ggt_ret_t ", (isExport ? "GEPIX_EXPORT " : ""), name, "(ggt_thread_t*, ",
         decl.sig.result_types, "*, ");
   Write(ModuleInstanceTypeName(), "*");
   WriteParamTypes(decl);
@@ -2022,7 +2023,7 @@ void CWriter::WriteTailCallFuncDeclaration(const std::string& mangled_name) {
 void CWriter::WriteImportFuncDeclaration(const FuncDeclaration& decl,
                                          const std::string& module_name,
                                          const std::string& name) {
-  Write("ggt_ret_t ", name, "(ggt_thread_t*, ", decl.sig.result_types, "*, ");
+  Write("ggt_ret_t GEPIX_IMPORT ", name, "(ggt_thread_t*, ", decl.sig.result_types, "*, ");
   Write("struct ", ModuleInstanceTypeName(module_name), "*");
   WriteParamTypes(decl);
   Write(")");
@@ -2144,7 +2145,7 @@ void CWriter::WriteMemory(const std::string& name, const Memory& memory) {
 }
 
 void CWriter::WriteMemoryPtr(const std::string& name, const Memory& memory) {
-  Write(GetMemoryTypeString(memory), "* ", name, "(", ModuleInstanceTypeName(),
+  Write(GetMemoryTypeString(memory), " GEPIX_EXPORT *", name, "(", ModuleInstanceTypeName(),
         "* instance)");
 }
 
@@ -2353,8 +2354,8 @@ void CWriter::WriteElemInitializerDecls() {
 }
 
 void CWriter::WriteFuncRefWrapper(const Func* func) {
-  Write("static ", func->decl.sig.result_types, " ", WrapperRef(func->name));
-  Write("(void *instance");
+  Write("static ggt_ret_t ", WrapperRef(func->name));
+  Write("(void *thr, void *ret, void *instance");
   if (func->GetNumParams() != 0) {
     Indent(4);
     for (Index i = 0; i < func->GetNumParams(); ++i) {
@@ -2380,7 +2381,9 @@ void CWriter::WriteFuncRefWrapper(const Func* func) {
     target_module_name = ModuleInstanceTypeName();
   }
 
-  Write("((struct ", target_module_name, "*) instance");
+  Write("((ggt_thread_t *) thr, ");
+  Write("(", func->decl.sig.result_types, " *) ret, ");
+  Write("(struct ", target_module_name, "*) instance");
   if (func->GetNumParams() != 0) {
     Indent(4);
     for (Index i = 0; i < func->GetNumParams(); ++i) {
@@ -2609,13 +2612,13 @@ void CWriter::WriteExports(CWriterPhase kind) {
         const Func* func = module_->GetFunc(export_->var);
         internal_name = func->name;
         if (kind == CWriterPhase::Declarations) {
-          WriteFuncDeclaration(func->decl, mangled_name);
+          WriteFuncDeclaration(func->decl, mangled_name, true);
         } else {
           func_ = func;
           local_syms_ = global_syms_;
           local_sym_map_.clear();
           stack_var_sym_map_.clear();
-          Write("ggt_ret_t ", mangled_name, "(ggt_thread_t *thr, ",
+          Write("ggt_ret_t GEPIX_EXPORT ", mangled_name, "(ggt_thread_t *thr, ",
                 func_->decl.sig.result_types, " *ret, ");
           MakeTypeBindingReverseMapping(func_->GetNumParamsAndLocals(),
                                         func_->bindings, &index_to_name);
@@ -2770,7 +2773,7 @@ void CWriter::WriteTailCallExports(CWriterPhase kind) {
 }
 
 void CWriter::WriteInit() {
-  Write(Newline(), "void ", kAdminSymbolPrefix, module_prefix_, "_instantiate(",
+  Write(Newline(), "void GEPIX_EXPORT ", kAdminSymbolPrefix, module_prefix_, "_instantiate(",
         ModuleInstanceTypeName(), "* instance");
   for (const auto& import_module_name : import_module_set_) {
     Write(", struct ", ModuleInstanceTypeName(import_module_name), "* ",
@@ -2824,6 +2827,10 @@ void CWriter::WriteInit() {
     RestoreSegueBase();
   }
   Write(CloseBrace(), Newline());
+
+  Write(Newline(), "size_t GEPIX_EXPORT ", kAdminSymbolPrefix, module_prefix_, "_instance_size() ",
+        OpenBrace(), " return sizeof(", ModuleInstanceTypeName(), "); ",
+        Newline(), CloseBrace(), Newline());
 }
 
 void CWriter::WriteGetFuncType() {
@@ -3149,7 +3156,7 @@ void CWriter::Write(const Func& func) {
   WriteParamsAndLocals();
   Write("FUNC_PROLOGUE;", Newline());
 
-  size_t stack_vars_section = func_sections_.size() - 1;
+  size_t stack_vars_section = func_sections_.size() - 2;
   PushFuncSection();
 
   std::string label = DefineLabelName(kImplicitFuncLabel);

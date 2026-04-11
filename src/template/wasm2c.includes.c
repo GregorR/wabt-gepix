@@ -15,4 +15,5 @@
 #include <alloca.h>
 #endif
 
+#include "gepix/config.h"
 #include "ggt/best.h"

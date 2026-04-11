@@ -28,6 +28,13 @@
 #include <unistd.h>
 #endif
 
+#if defined(__WINDOWS__) || defined(_WIN16) || defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#define WASM_RT_EXPORT __declspec(dllexport) WINAPI
+#else
+#define WASM_RT_EXPORT
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -476,7 +483,7 @@ typedef struct {
 typedef void* wasm_rt_externref_t;
 
 /** Default (null) value of an externref */
-#define wasm_rt_externref_null_value ((wasm_rt_externref_t){NULL})
+#define wasm_rt_externref_null_value ((wasm_rt_externref_t) NULL)
 
 /** A Memory object. */
 typedef struct {
@@ -558,13 +565,13 @@ typedef struct {
 } wasm_rt_externref_table_t;
 
 /** Initialize the runtime. */
-void wasm_rt_init(void);
+void WASM_RT_EXPORT wasm_rt_init(void);
 
 /** Is the runtime initialized? */
-bool wasm_rt_is_initialized(void);
+bool WASM_RT_EXPORT wasm_rt_is_initialized(void);
 
 /** Free the runtime's state. */
-void wasm_rt_free(void);
+void WASM_RT_EXPORT wasm_rt_free(void);
 
 /*
  * Initialize the multithreaded runtime for a given thread. Must be
@@ -572,12 +579,12 @@ void wasm_rt_free(void);
  * before initializing a Wasm module or calling an exported
  * function.
  */
-void wasm_rt_init_thread(void);
+void WASM_RT_EXPORT wasm_rt_init_thread(void);
 
 /*
  * Free the individual thread's state.
  */
-void wasm_rt_free_thread(void);
+void WASM_RT_EXPORT wasm_rt_free_thread(void);
 
 /** A hardened jmp_buf that allows checking for initialization before use */
 typedef struct {
@@ -615,7 +622,7 @@ typedef struct {
  *
  * This is typically called by the generated code, and not the embedder.
  */
-WASM_RT_NO_RETURN void wasm_rt_trap(wasm_rt_trap_t);
+WASM_RT_NO_RETURN void WASM_RT_EXPORT wasm_rt_trap(wasm_rt_trap_t);
 
 /** Return a human readable error string based on a trap type. */
 const char* wasm_rt_strerror(wasm_rt_trap_t trap);
@@ -636,7 +643,7 @@ const char* wasm_rt_strerror(wasm_rt_trap_t trap);
  *    wasm_rt_allocate_memory(&my_memory, 1, 2, false, WASM_DEFAULT_PAGE_SIZE);
  *  ```
  */
-void wasm_rt_allocate_memory(wasm_rt_memory_t*,
+void WASM_RT_EXPORT wasm_rt_allocate_memory(wasm_rt_memory_t*,
                              uint64_t initial_pages,
                              uint64_t max_pages,
                              bool is64,
@@ -660,7 +667,7 @@ void wasm_rt_allocate_memory(wasm_rt_memory_t*,
 uint64_t wasm_rt_grow_memory(wasm_rt_memory_t*, uint64_t pages);
 
 /** Free a Memory object. */
-void wasm_rt_free_memory(wasm_rt_memory_t*);
+void WASM_RT_EXPORT wasm_rt_free_memory(wasm_rt_memory_t*);
 
 #ifdef WASM_RT_C11_AVAILABLE
 /** Shared memory version of wasm_rt_allocate_memory */
@@ -687,12 +694,12 @@ void wasm_rt_free_memory_shared(wasm_rt_shared_memory_t*);
  *    wasm_rt_allocate_funcref_table(&my_table, 5, 10);
  *  ```
  */
-void wasm_rt_allocate_funcref_table(wasm_rt_funcref_table_t*,
+void WASM_RT_EXPORT wasm_rt_allocate_funcref_table(wasm_rt_funcref_table_t*,
                                     uint32_t elements,
                                     uint32_t max_elements);
 
 /** Free a funcref Table object. */
-void wasm_rt_free_funcref_table(wasm_rt_funcref_table_t*);
+void WASM_RT_EXPORT wasm_rt_free_funcref_table(wasm_rt_funcref_table_t*);
 
 /**
  * Initialize an externref Table object with an element count

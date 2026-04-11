@@ -101,7 +101,12 @@ static inline bool add_overflow(uint64_t a, uint64_t b, uint64_t* resptr) {
 #elif defined(_MSC_VER)
   return _addcarry_u64(0, a, b, resptr);
 #else
-#error "Missing implementation of __builtin_add_overflow or _addcarry_u64"
+  uint64_t res;
+  *resptr = res = a + b;
+  if (res < a)
+      return true;
+  else
+      return false;
 #endif
 }
 
@@ -778,7 +783,7 @@ DEFINE_TABLE_SET(externref)
                                        u64 n) {                               \
     uint32_t i;                                                               \
     RANGE_CHECK(table, d, n);                                                 \
-    for (uint32_t i = d; i < d + n; i++) {                                    \
+    for (i = d; i < d + n; i++) {                                             \
       table->data[i] = val;                                                   \
     }                                                                         \
   }
