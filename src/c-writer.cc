@@ -1834,6 +1834,7 @@ void CWriter::BeginInstance() {
       case ExternalKind::Global: {
         const Global& global = cast<GlobalImport>(import)->global;
         Write(global.type);
+        Write(" GEPIX_IMPORT ");
         break;
       }
 
@@ -2120,7 +2121,7 @@ void CWriter::WriteGlobal(const Global& global, const std::string& name) {
 }
 
 void CWriter::WriteGlobalPtr(const Global& global, const std::string& name) {
-  Write(global.type, "* ", name, "(", ModuleInstanceTypeName(), "* instance)");
+  Write(global.type, " GEPIX_EXPORT * ", name, "(", ModuleInstanceTypeName(), "* instance)");
 }
 
 void CWriter::WriteMemories() {

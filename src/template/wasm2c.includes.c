@@ -16,4 +16,5 @@
 #endif
 
 #include "gepix/config.h"
+#include "gepix/gec.h"
 #include "ggt/best.h"

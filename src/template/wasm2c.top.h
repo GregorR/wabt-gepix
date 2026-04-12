@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "gepix/config.h"
+#include "gepix/gec.h"
 #include "ggt/best.h"
 
 #ifndef WASM_RT_CORE_TYPES_DEFINED
