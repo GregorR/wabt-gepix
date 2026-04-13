@@ -1379,7 +1379,8 @@ void CWriter::Write(const Const& const_) {
 }
 
 void CWriter::WriteInitDecl() {
-  Write("void GEPIX_EXPORT ", kAdminSymbolPrefix, module_prefix_, "_instantiate(",
+  Write("ggt_ret_t GEPIX_EXPORT ", kAdminSymbolPrefix, module_prefix_, "_instantiate(",
+        "ggt_thread_t *, ",
         ModuleInstanceTypeName(), "*");
   for (const auto& import_module_name : import_module_set_) {
     Write(", struct ", ModuleInstanceTypeName(import_module_name), "*");
@@ -1776,6 +1777,21 @@ void CWriter::WriteTags() {
 void CWriter::ComputeUniqueImports() {
   using modname_name_pair = std::pair<std::string, std::string>;
   std::map<modname_name_pair, const Import*> import_map;
+
+  // Find self-imports
+  for (Import* imp : module_->imports) {
+    for (const Export* exp : module_->exports) {
+      if (imp->field_name == exp->name) {
+        imp->module_name = options_.module_name;
+        break;
+      }
+    }
+
+    // And get rid of the GOT
+    if (imp->module_name == "GOT.mem")
+      imp->module_name = "env";
+  }
+
   for (const Import* import : module_->imports) {
     // After emplacing, the returned bool says whether the insert happened;
     // i.e., was there already an import with the same modname and name?
@@ -2774,52 +2790,72 @@ void CWriter::WriteTailCallExports(CWriterPhase kind) {
 }
 
 void CWriter::WriteInit() {
-  Write(Newline(), "void GEPIX_EXPORT ", kAdminSymbolPrefix, module_prefix_, "_instantiate(",
+  Write(Newline(), "GGT(", kAdminSymbolPrefix, module_prefix_, "_instantiate, (",
+        "ggt_thread_t *thr, ",
         ModuleInstanceTypeName(), "* instance");
   for (const auto& import_module_name : import_module_set_) {
     Write(", struct ", ModuleInstanceTypeName(import_module_name), "* ",
           GlobalName(ModuleFieldType::Import, import_module_name));
   }
+  Write("),", Newline());
+
+  Write("GGT_P(", ModuleInstanceTypeName(), " *, instance)", Newline());
+  for (const auto& import_module_name : import_module_set_) {
+    Write("GGT_P(struct ", ModuleInstanceTypeName(import_module_name), "*, ",
+          GlobalName(ModuleFieldType::Import, import_module_name),
+          ")", Newline());
+  }
+
+  Write(",", Newline());
+
+  Write("GGT_T(instance);", Newline());
+  for (const auto& import_module_name : import_module_set_) {
+    Write("GGT_T(",
+          GlobalName(ModuleFieldType::Import, import_module_name),
+          ");", Newline());
+  }
+
   Write(") ", OpenBrace());
 
   Write("assert(wasm_rt_is_initialized());", Newline());
 
   if (!import_module_set_.empty()) {
-    Write("init_instance_import(instance");
+    Write("init_instance_import(GGT_L(instance)");
     for (const auto& import_module_name : import_module_set_) {
-      Write(", ", GlobalName(ModuleFieldType::Import, import_module_name));
+      Write(", GGT_L(", GlobalName(ModuleFieldType::Import, import_module_name), ")");
     }
     Write(");", Newline());
   }
 
   if (!module_->globals.empty()) {
-    Write("init_globals(instance);", Newline());
+    Write("init_globals(GGT_L(instance));", Newline());
   }
   if (!module_->tables.empty()) {
-    Write("init_tables(instance);", Newline());
+    Write("init_tables(GGT_L(instance));", Newline());
   }
   if (!module_->memories.empty()) {
-    Write("init_memories(instance);", Newline());
+    Write("init_memories(GGT_L(instance));", Newline());
     if (IsSingleUnsharedMemory()) {
       InstallSegueBase(module_->memories[0], true /* save_old_value */);
     }
   }
   if (!module_->tables.empty() && !module_->elem_segments.empty()) {
-    Write("init_elem_instances(instance);", Newline());
+    Write("init_elem_instances(GGT_L(instance));", Newline());
   }
   if (!module_->memories.empty() && !module_->data_segments.empty()) {
-    Write("init_data_instances(instance);", Newline());
+    Write("init_data_instances(GGT_L(instance));", Newline());
   }
 
   for (Var* var : module_->starts) {
+    Write("GGT_CALL(");
     Write(ExternalRef(ModuleFieldType::Func, module_->GetFunc(*var)->name));
     if (IsImport(module_->GetFunc(*var)->name)) {
-      Write("(instance->",
+      Write(", (thr, NULL, GGT_L(instance)->",
             GlobalName(ModuleFieldType::Import,
                        import_module_sym_map_[module_->GetFunc(*var)->name]),
-            ");");
+            "));");
     } else {
-      Write("(instance);");
+      Write(", (thr, NULL, GGT_L(instance)));");
     }
     Write(Newline());
   }
@@ -2827,6 +2863,7 @@ void CWriter::WriteInit() {
   if (IsSingleUnsharedMemory()) {
     RestoreSegueBase();
   }
+  Write("GGT_END();", Newline());
   Write(CloseBrace(), Newline());
 
   Write(Newline(), "size_t GEPIX_EXPORT ", kAdminSymbolPrefix, module_prefix_, "_instance_size() ",
