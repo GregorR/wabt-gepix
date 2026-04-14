@@ -357,7 +357,7 @@ static type name ## _REV(type x) { \
   for (i = 0; i < (bits); i++) { \
     r <<= 1; \
     if (x & 1) r |= 1; \
-    i >>= 1; \
+    x >>= 1; \
   } \
   return r; \
 }
